@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindspark_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=False
+      - USE_SQLITE_LOCAL=False
+      - DATABASE_URL=postgresql+asyncpg://mindspark:mindspark_pass@postgres:5432/mindspark_db
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_ENABLED=True
+      - SECRET_KEY=mindspark_prod_secret_key_change_me_in_live_env_12345
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mindspark_net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mindspark_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: mindspark
+      POSTGRES_PASSWORD: mindspark_pass
+      POSTGRES_DB: mindspark_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mindspark -d mindspark_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mindspark_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: mindspark_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mindspark_net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  mindspark_net:
+    driver: bridge
+
